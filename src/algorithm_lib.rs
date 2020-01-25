@@ -73,18 +73,32 @@ pub fn color_distance(a: KMeansPixel, b: KMeansPixel) -> f64 {
             + 2.0 * (a.rgb.2 as f64 - b.rgb.2 as f64).powf(2.0))
         .powf(0.5)
     };
-
     cd
 }
 
-
+// Converts an image to a vector of KMeanPixel structures, and returns that and the images dimensions in a tuple
+// Pixels are written to a vector in rows (row 0 all written, then row 1 all written, row 2, etc.)
 pub fn build_kmeans_pixel_list_from_image(
     img_path: &str,
     clusters: Vec<(u8, u8, u8)>,
 ) -> (Vec<KMeansPixel>, u32, u32) {
-    let img = image::open(img_path).expect("Couldn't open the image");
+    let mut img = image::open(img_path).expect("Couldn't open the image");
     let (w, h) = img.dimensions();
     println!("Image dimensions: ({},{})", w, h);
+
+    let max: f32 = 235.;
+    let min: f32 = 10.;
+    for y in 0..h {
+        for x in 0..w {
+            let pixel = img.get_pixel(x,y);
+            let (mut r, mut g, mut b) = (pixel[0] as f32,pixel[1] as f32,pixel[2] as f32);
+            r = ((r / 255.0) * (max - min)) + min;
+            g = ((g / 255.0) * (max - min)) + min;
+            b = ((b / 255.0) * (max - min)) + min;
+            img.put_pixel(x,y,image::Rgba([r as u8, g as u8, b as u8, 0]));
+        }
+    }
+    img.save("normalized.png").expect("Couldn't write the normalized image");
 
     let mut kmeans_pixels: Vec<KMeansPixel> = Vec::with_capacity(w as usize * h as usize); // Pre-allocating this cluster meaningfully improves performance
     for y in 0..h {
@@ -136,32 +150,10 @@ pub fn build_kmeans_pixel_list_from_image(
     (kmeans_pixels, w, h)
 }
 
-pub fn cluster_image(
-    img_path: &str,
-    num_clusters: usize,
-) -> (ImageBuffer<Rgb<u8>, Vec<u8>>, Vec<(u8, u8, u8)>) {
-    // Seeding and building the list of clusters
-    let mut rng = rand::thread_rng();
-    //let num_clusters = 3;
-    // Here, we're doing clustering in the RGB subspace alone
-    let mut clusters: Vec<(u8, u8, u8)> = Vec::with_capacity(num_clusters);
-    for i in 0..num_clusters {
-        clusters.push((
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-        ));
-        println!("{:?}", clusters[i]);
-    }
-    let mut cluster_colors: Vec<(u8, u8, u8)> = Vec::with_capacity(num_clusters);
-    for i in 0..num_clusters {
-        cluster_colors.push((
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-        ));
-    }
+pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
+    // Here, we're doing clustering in the RGB subspace alone
+    let mut clusters: Vec<(u8, u8, u8)> = build_clusters(num_clusters);
     let (mut kmeans_pixels, w, h) = build_kmeans_pixel_list_from_image(img_path, clusters.clone());
 
     let mut iteration = 0;
@@ -169,6 +161,7 @@ pub fn cluster_image(
     let mut cval = 255; // A value to determine when the variation between cluster iterations has converged (Convergence VALue)
     let max_iterations = 10;
 
+    // MAIN KMEANS LOOP
     // As long as the cluster centroids haven't converged and we haven't cycled through a certain number of iterations,
     // keep updating the cluster values
     while (cval > num_clusters * 2) && (iteration < max_iterations) {
@@ -219,16 +212,6 @@ pub fn cluster_image(
             }
         }
         */
-        let mut counts: Vec<_> = Vec::new();
-        for n in 0..clusters.len() {
-            counts.push(0u32);
-            for point in &kmeans_pixels {
-                if point.cluster == n {
-                    counts[n] += 1;
-                }
-            }
-        }
-        println!("{:?}", counts);
 
         // Update the location of the clusters
         prev_clusters = clusters.clone();
@@ -269,21 +252,46 @@ pub fn cluster_image(
         cval = check_cluster_sum_diff(clusters.clone(), prev_clusters);
         println!("The cval in iteration #{} was {}", iteration, cval);
         iteration += 1;
+
+        // Let's check that our clusters are valid, and if not, we'll reset
+        let mut counts: Vec<_> = Vec::new();
+        for n in 0..clusters.len() {
+            counts.push(0u32);
+            for point in &kmeans_pixels {
+                if point.cluster == n {
+                    counts[n] += 1;
+                }
+            }
+        }
+        println!("Counts per cluster: {:?}", counts);
+        // IMPORTANT: If the point in any given cluster drops to zero, we start over
+        // and assign the cluster new starting points
+        for points_in_cluster in &counts {
+            if points_in_cluster.clone() == 0 {
+                iteration = 0;
+                let new_clusters = build_clusters(num_clusters);
+                for i in 0..num_clusters {
+                    clusters[i] = new_clusters[i];
+                }
+            }
+        }
+
     }
     println!("{} underwent {} iterations", img_path, iteration);
 
+    // BUILDING CLUSTERED IMAGE
     // Built clusters, now iterating through pixels to re-build clustered image
     let mut clustered_img = image::ImageBuffer::new(w, h);
     for y in 0..h {
         for x in 0..w {
             let ppx = kmeans_pixels[(w * y + x) as usize];
-            let r = cluster_colors[ppx.cluster].0;
-            let g = cluster_colors[ppx.cluster].1;
-            let b = cluster_colors[ppx.cluster].2;
+            let r = clusters[ppx.cluster].0;
+            let g = clusters[ppx.cluster].1;
+            let b = clusters[ppx.cluster].2;
             clustered_img.put_pixel(x, y, image::Rgb([r, g, b]));
         }
     }
-    (clustered_img, clusters)
+    clustered_img
 
     // Sleeping the thread here can help us visualize the clustering process
     //std::thread::sleep(std::time::Duration::from_millis(1500));
@@ -309,4 +317,20 @@ fn check_cluster_sum_diff(a: Vec<(u8, u8, u8)>, b: Vec<(u8, u8, u8)>) -> usize {
         println!("diff: {}", diff);
     }
     diff as usize
+}
+
+fn build_clusters(num_clusters: usize) -> Vec<(u8,u8,u8)> {
+    let mut cluster_rng = rand::thread_rng();
+    let mut clusters: Vec<(u8,u8,u8)> = Vec::with_capacity(num_clusters);
+    println!("Number of clusters is: {}",num_clusters);
+    for i in 0..num_clusters {
+        // Randomly generates initial clusters
+        clusters.push((
+            cluster_rng.gen_range(50,200) as u8,
+            cluster_rng.gen_range(50,200) as u8,
+            cluster_rng.gen_range(50,200) as u8,
+        ));
+        println!("Cluster {}: {:?}",i, clusters[i]);
+    }
+    clusters
 }

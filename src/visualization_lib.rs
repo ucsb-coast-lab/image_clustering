@@ -90,3 +90,46 @@ pub fn kmeans_plot(kmeans_list: Vec<KMeansPixel>, clusters: Vec<(f64, f64)>, pat
     //std::thread::sleep(std::time::Duration::from_millis(1500));
     //println!("\n");
 }
+
+pub fn scatter_image_sandbox(img_path: &str, export_path: &str) {
+    // let img_path = "kelp.jpg";
+    // let export_path = "clustered_img.png";
+    let num_clusters = 3;
+    let mut clusters: Vec<(u8, u8, u8)> = Vec::with_capacity(num_clusters);
+    let mut rng = rand::thread_rng();
+    for i in 0..num_clusters {
+        // Randomly generates initial clusters
+        clusters.push((
+            rng.gen_range(0, 255) as u8,
+            rng.gen_range(0, 255) as u8,
+            rng.gen_range(0, 255) as u8,
+        ));
+    }
+    let( pixel_vec,w,h) = build_kmeans_pixel_list_from_image(img_path, clusters);
+    let mut vis_vec: Vec<(f64, f64)> = Vec::with_capacity(pixel_vec.len());
+    let (mut min_x, mut max_x, mut min_y, mut max_y) = (0f64,0f64,0f64,0f64);
+    for pixel in &pixel_vec {
+        vis_vec.push((pixel.rgb.1 as f64,pixel.rgb.2 as f64));
+    }
+    //println!("{:?}",vis_vec);
+
+    let mut v = ContinuousView::new()
+        .x_range(0., 255.)
+        .y_range(0., 255.)
+        .x_label("g")
+        .y_label("b");
+    let s: Scatter = Scatter::from_slice(&vis_vec).style(
+        PointStyle::new()
+            .marker(PointMarker::Square) // setting the marker to be a square
+            .colour("123456"),
+    );
+    v.representations.push(Box::new(s));
+    let svg_path = "cluster_img.svg";
+    Page::single(&v).save(&svg_path).unwrap();
+    Command::new("cairosvg")
+        .arg(svg_path)
+        .arg("-o")
+        .arg(export_path)
+        .output()
+        .expect("failed to convert .svg file to .png file");
+}

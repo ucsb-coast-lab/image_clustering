@@ -8,6 +8,6 @@ $ cargo run --release pictures/kelp.jpg
 
 A sample of the pre- and post-processed images can be found below, for kelp growing on a longline.
 
-<p align="right"><img src="/pictures/submerged_kelp1.png" width="400" height="300" align="left"><img src="/pictures/clustered_submerged1_3.png" width="400" height="300" /></p>
+<p align="right"><img src="/pictures/submerged_kelp.png" width="400" height="300" align="left"><img src="/pictures/processed/submerged_kelp.png" width="400" height="300" /></p>
 
 If using this program to process data for publication, please cite the UCSB COAST Lab. Thank you!

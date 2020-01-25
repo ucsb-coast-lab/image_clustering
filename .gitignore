@@ -1,3 +1,7 @@
 /target
 **/*.rs.bk
 webcam/
+kelp.jpg
+cluster_img.svg
+clustered_img.png
+normalized.png

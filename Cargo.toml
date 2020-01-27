@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 image = "0.22.3"
+imageproc = "0.19.2"
 rand = "0.7.2"
-rand_pcg = "0.2.1"
+rscam = "0.5.5"
 plotlib = { git = "https://github.com/quietlychris/plotlib", branch = "master" }

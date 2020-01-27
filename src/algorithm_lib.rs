@@ -1,4 +1,5 @@
 use crate::*;
+use imageproc::drawing::{draw_cross_mut,draw_hollow_circle_mut};
 
 #[derive(Debug, Clone, Copy)]
 pub struct KMeansPixel {
@@ -160,6 +161,9 @@ pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>
     let mut prev_clusters: Vec<(u8, u8, u8)> = Vec::with_capacity(num_clusters);
     let mut cval = 255; // A value to determine when the variation between cluster iterations has converged (Convergence VALue)
     let max_iterations = 10;
+    let mut final_counts: Vec<_> = Vec::with_capacity(num_clusters);
+
+
 
     // MAIN KMEANS LOOP
     // As long as the cluster centroids haven't converged and we haven't cycled through a certain number of iterations,
@@ -255,6 +259,9 @@ pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>
 
         // Let's check that our clusters are valid, and if not, we'll reset
         let mut counts: Vec<_> = Vec::new();
+        for i in 0..counts.len() {
+            counts[i] = 0;
+        }
         for n in 0..clusters.len() {
             counts.push(0u32);
             for point in &kmeans_pixels {
@@ -264,6 +271,7 @@ pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>
             }
         }
         println!("Counts per cluster: {:?}", counts);
+        final_counts = counts.clone();
         // IMPORTANT: If the point in any given cluster drops to zero, we start over
         // and assign the cluster new starting points
         for points_in_cluster in &counts {
@@ -275,9 +283,27 @@ pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>
                 }
             }
         }
-
     }
     println!("{} underwent {} iterations", img_path, iteration);
+
+    // Find the x,y centers of each cluster
+    let mut cluster_centers: Vec<(u32,u32)> = Vec::with_capacity(num_clusters);
+    for n in 0..num_clusters {
+        cluster_centers.push((0,0));
+    }
+
+    for pixel in &kmeans_pixels {
+        cluster_centers[pixel.cluster].0 += (pixel.position.0 as u32);
+        cluster_centers[pixel.cluster].1 += (pixel.position.1 as u32);
+    }
+
+    for n in 0..cluster_centers.len() {
+        let (x_avg,y_avg) = (cluster_centers[n].0/(final_counts[n]),cluster_centers[n].1/(final_counts[n]));
+        cluster_centers[n].0 = x_avg;
+        cluster_centers[n].1 = y_avg;
+    }
+    println!("Cluster centers are {:?}",cluster_centers);
+
 
     // BUILDING CLUSTERED IMAGE
     // Built clusters, now iterating through pixels to re-build clustered image
@@ -290,6 +316,10 @@ pub fn cluster_image(img_path: &str, num_clusters: usize) -> ImageBuffer<Rgb<u8>
             let b = clusters[ppx.cluster].2;
             clustered_img.put_pixel(x, y, image::Rgb([r, g, b]));
         }
+    }
+
+    for center in &cluster_centers {
+        draw_hollow_circle_mut(&mut clustered_img,(center.0 as i32,center.1 as i32),200,image::Rgb([0,0,0]));
     }
     clustered_img
 

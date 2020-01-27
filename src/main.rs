@@ -6,18 +6,19 @@ use image::*;
 
 mod algorithm_lib;
 mod visualization_lib;
+mod externals_lib;
 
 use algorithm_lib::*;
 use visualization_lib::scatter_image_sandbox;
+use externals_lib::*;
 
 use rand::{Rng,SeedableRng};
-//use std::ffi::OsString;
-// use std::error::Error;
 use std::env;
 
 fn main() {
     let export_dir = "pictures/processed/";
     let args: Vec<_> = env::args_os().collect();
+    // capture_images("/dev/video0",10,200,"pictures/captured");
     let num_clusters = 4;
     for i in 1..args.len() {
         //println!("Attempting to open: {:?}",args[i]);

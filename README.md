@@ -6,8 +6,8 @@ This is a program uses a clustering algorithm to group pixels into a provided nu
 $ cargo run --release pictures/kelp.jpg
 ```
 
-A sample of the pre- and post-processed images can be found below, for kelp growing on a longline.
+A sample of the pre- and post-processed images can be found below, for an overhead shot of a kelp forest.
 
-<p align="right"><img src="/pictures/submerged_kelp.png" width="400" height="300" align="left"><img src="/pictures/processed/submerged_kelp.png" width="400" height="300" /></p>
+<p align="right"><img src="/pictures/kelp.jpg" width="400" height="300" align="left"><img src="/pictures/processed/kelp.jpg" width="400" height="300" /></p>
 
 If using this program to process data for publication, please cite the UCSB COAST Lab. Thank you!

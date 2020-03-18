@@ -94,22 +94,26 @@ pub fn kmeans_plot(kmeans_list: Vec<KMeansPixel>, clusters: Vec<(f64, f64)>, pat
 pub fn scatter_image_sandbox(img_path: &str, export_path: &str) {
     // let img_path = "kelp.jpg";
     // let export_path = "clustered_img.png";
+    let mut img = image::open(img_path).expect("Couldn't open the image");
+    let (w, h) = img.dimensions();
     let num_clusters = 3;
-    let mut clusters: Vec<(u8, u8, u8)> = Vec::with_capacity(num_clusters);
-    let mut rng = rand::thread_rng();
+    let mut clusters: Vec<Cluster> = Vec::with_capacity(num_clusters);
+    let mut cluster_rng = rand::thread_rng();
     for i in 0..num_clusters {
         // Randomly generates initial clusters
-        clusters.push((
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-            rng.gen_range(0, 255) as u8,
-        ));
+        clusters.push(Cluster {
+            x: cluster_rng.gen_range(0, w),
+            y: cluster_rng.gen_range(0, h),
+            r: cluster_rng.gen_range(50, 200) as u8,
+            g: cluster_rng.gen_range(50, 200) as u8,
+            b: cluster_rng.gen_range(50, 200) as u8,
+        });
     }
-    let( pixel_vec,w,h) = build_kmeans_pixel_list_from_image(img_path, clusters);
+    let (pixel_vec, w, h) = build_kmeans_pixel_list_from_image(img_path, clusters);
     let mut vis_vec: Vec<(f64, f64)> = Vec::with_capacity(pixel_vec.len());
-    let (mut min_x, mut max_x, mut min_y, mut max_y) = (0f64,0f64,0f64,0f64);
+    let (mut min_x, mut max_x, mut min_y, mut max_y) = (0f64, 0f64, 0f64, 0f64);
     for pixel in &pixel_vec {
-        vis_vec.push((pixel.rgb.1 as f64,pixel.rgb.2 as f64));
+        vis_vec.push((pixel.rgb.1 as f64, pixel.rgb.2 as f64));
     }
     //println!("{:?}",vis_vec);
 

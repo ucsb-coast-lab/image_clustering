@@ -2,10 +2,11 @@ use crate::*;
 use imageproc::drawing::{draw_cross_mut, draw_hollow_circle_mut};
 
 #[derive(Debug, Clone, Copy)]
-pub struct KMeansPixel {
-    pub position: (u32, u32),
+pub struct CPixel {
+    pub x: u32,
+    pub y: u32,
     pub rgb: (u8, u8, u8),
-    pub cluster: usize,
+    pub assigned_cluster: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -17,12 +18,36 @@ pub struct Cluster {
     pub b: u8,
 }
 
-impl KMeansPixel {
+impl CPixel {
     fn print(&self) {
         print!(
             "Point: ({:.2},{:.2}), rgb: ({},{},{}), cluster: {}",
-            self.position.0, self.position.1, self.rgb.0, self.rgb.1, self.rgb.2, self.cluster
+            self.x, self.y, self.rgb.0, self.rgb.1, self.rgb.2, self.assigned_cluster
         );
+    }
+
+    fn new(x: u32, y: u32, rgb:(u8,u8,u8),assigned_cluster: usize) -> Self {
+        CPixel {
+            x: x, y: y, rgb: rgb, assigned_cluster: assigned_cluster
+        }
+    }
+
+    fn calculate_distance(&self, b: CPixel) -> f64 {
+        //((self.x as f32 - b.x as f32).powf(2.0) + (self.y as f32 - b.y as f32).powf(2.0)).powf(0.5)
+
+        let cd = ((self.rgb.0 as f64 - b.rgb.0 as f64).abs().powf(2.0)
+            + (self.rgb.1 as f64 - b.rgb.1 as f64).abs().powf(2.0)
+            + (self.rgb.2 as f64 - b.rgb.2 as f64).abs().powf(2.0))
+        .powf(0.5);
+
+        /*let pd = ((self.x as f64 - b.x as f64).powf(2.0)
+            + (self.y as f64 - b.y as f64).powf(2.0))
+        .powf(0.5);
+
+        let metric = pd + cd;
+        metric
+        */
+        cd
     }
 }
 
@@ -36,16 +61,16 @@ pub fn get_distance(a: (u32, u32), b: (u32, u32)) -> f64 {
 // for mapping the x,y,r,g,b differences into a 2D parameter space and graphing
 // that, at which point the standard 2D kmeans algorithm can work
 
-pub fn get_variation(a: KMeansPixel, b: KMeansPixel) -> f64 {
-    let dist = ((a.position.0 as f64 - b.position.0 as f64).abs().powf(2.0)
-        + (a.position.1 as f64 - b.position.1 as f64).abs().powf(2.0))
+pub fn get_variation(a: CPixel, b: CPixel) -> f64 {
+    let dist = ((a.x as f64 - b.x as f64).abs().powf(2.0)
+        + (a.y as f64 - b.y as f64).abs().powf(2.0))
     .sqrt();
     let color_error = color_distance(a, b);
 
     dist + (color_error / 2.0)
 }
 
-pub fn convert_to_subspace(data: Vec<KMeansPixel>) -> Vec<(f64, f64)> {
+pub fn convert_to_subspace(data: Vec<CPixel>) -> Vec<(f64, f64)> {
     let mut subspace: Vec<(f64, f64)> = Vec::new();
 
     //let (mut dist_param, mut color_param): (f64,f64) = (0.0,0.0);
@@ -59,7 +84,7 @@ pub fn convert_to_subspace(data: Vec<KMeansPixel>) -> Vec<(f64, f64)> {
     subspace
 }
 
-pub fn color_distance(a: KMeansPixel, b: KMeansPixel) -> f64 {
+pub fn color_distance(a: CPixel, b: CPixel) -> f64 {
     // Euclidean distance
     /*
     let cd = ((a.rgb.0 as f64 - b.rgb.0 as f64).abs().powf(2.0)
@@ -87,8 +112,8 @@ pub fn color_distance(a: KMeansPixel, b: KMeansPixel) -> f64 {
     cd
 }
 
-pub fn clustering_metric(a: KMeansPixel, b: KMeansPixel, ratio: f64) -> f64 {
-    let c = a.cluster;
+pub fn clustering_metric(a: CPixel, b: CPixel, ratio: f64) -> f64 {
+    let c = a.assigned_cluster;
 
     // Euclidean distance
 
@@ -97,8 +122,8 @@ pub fn clustering_metric(a: KMeansPixel, b: KMeansPixel, ratio: f64) -> f64 {
         + (a.rgb.2 as f64 - b.rgb.2 as f64).abs().powf(2.0))
     .powf(0.5);
 
-    let pd = ((a.position.0 as f64 - b.position.0 as f64).powf(2.0)
-        + (a.position.1 as f64 - b.position.1 as f64).powf(2.0))
+    let pd = ((a.x as f64 - b.x as f64).powf(2.0)
+        + (a.y as f64 - b.y as f64).powf(2.0))
     .powf(0.5);
 
     let metric = pd * ratio + cd;
@@ -110,7 +135,7 @@ pub fn clustering_metric(a: KMeansPixel, b: KMeansPixel, ratio: f64) -> f64 {
 pub fn build_kmeans_pixel_list_from_image(
     img_path: &str,
     clusters: Vec<Cluster>,
-) -> (Vec<KMeansPixel>, u32, u32) {
+) -> (Vec<CPixel>, u32, u32) {
     let mut img = image::open(img_path).expect("Couldn't open the image");
     let (w, h) = img.dimensions();
     println!("Image dimensions: ({},{})", w, h);
@@ -130,35 +155,38 @@ pub fn build_kmeans_pixel_list_from_image(
     img.save("normalized.png")
         .expect("Couldn't write the normalized image");
 
-    let mut kmeans_pixels: Vec<KMeansPixel> = Vec::with_capacity(w as usize * h as usize); // Pre-allocating this cluster meaningfully improves performance
+    let mut kmeans_pixels: Vec<CPixel> = Vec::with_capacity(w as usize * h as usize); // Pre-allocating this cluster meaningfully improves performance
     for y in 0..h {
         for x in 0..w {
             let pixel = img.get_pixel(x, y);
             let position = (x, y);
 
             let mut assigned_cluster = clusters[0];
-            let mut km_pixel = KMeansPixel {
-                position: position,
+            let mut km_pixel = CPixel {
+                x: x,
+                y: y,
                 rgb: (pixel[0], pixel[1], pixel[2]),
-                cluster: 0,
+                assigned_cluster: 0,
             };
 
             // Assigns easy pixel it's proper cluster
             for i in 0..clusters.len() {
                 //let cen_px = img.get_pixel(cluster.0 as u32, cluster.1 as u32);
-                let temp_cluster_pixel: KMeansPixel = KMeansPixel {
-                    position: (0, 0),
+                let temp_cluster_pixel: CPixel = CPixel {
+                    x: 0,
+                    y: 0,
                     rgb: (clusters[i].r, clusters[i].b, clusters[i].g),
-                    cluster: i,
+                    assigned_cluster: i,
                 };
 
-                let km_pixel_cluster: KMeansPixel = KMeansPixel {
-                    position: (0, 0),
+                let km_pixel_cluster: CPixel = CPixel {
+                    x: 0,
+                    y: 0,
                     rgb: (assigned_cluster.r, assigned_cluster.g, assigned_cluster.b),
-                    cluster: km_pixel.cluster,
+                    assigned_cluster: km_pixel.assigned_cluster,
                 };
 
-                // If the difference in color between the km_pixel and a cluster-based KMeansPixel is less than
+                // If the difference in color between the km_pixel and a cluster-based CPixel is less than
                 // the difference in color between the km_pixel and it's assigned cluster, the assigned_cluster
                 // value is changed to match
                 if color_distance(km_pixel.clone(), temp_cluster_pixel.clone())
@@ -171,7 +199,7 @@ pub fn build_kmeans_pixel_list_from_image(
                 .iter()
                 .position(|&value| value == assigned_cluster)
                 .expect("There was an error assigned a cluster index");
-            km_pixel.cluster = index;
+            km_pixel.assigned_cluster = index;
             //println!("km_cluster: {:?}",km_pixel);
 
             kmeans_pixels.push(km_pixel);
@@ -180,8 +208,11 @@ pub fn build_kmeans_pixel_list_from_image(
     (kmeans_pixels, w, h)
 }
 
-pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    // Here, we're doing clustering in the RGB subspace alone
+pub fn kmeans_cluster_image(
+    img_path: &str,
+    num_clusters: usize,
+    ratio: f64,
+) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let mut img = image::open(img_path).expect("Couldn't open the image");
     let (w, h) = img.dimensions();
     let mut clusters: Vec<Cluster> = build_random_clusters(num_clusters, w, h);
@@ -205,30 +236,32 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
                 let cluster = clusters[i];
 
                 // This is pixel updated each time the cluster list is iterated through
-                let temp_cluster_pixel: KMeansPixel = KMeansPixel {
-                    position: (clusters[i].x, clusters[i].y),
+                let temp_cluster_pixel: CPixel = CPixel {
+                    x: clusters[i].x,
+                    y: clusters[i].y,
                     rgb: (clusters[i].r, clusters[i].g, clusters[i].b),
-                    cluster: i,
+                    assigned_cluster: i,
                 };
 
-                let assigned_cluster_pixel: KMeansPixel = KMeansPixel {
-                    position: point.position,
+                let assigned_cluster_pixel: CPixel = CPixel {
+                    x: point.x,
+                    y: point.y,
                     rgb: (
-                        clusters[point.cluster].r,
-                        clusters[point.cluster].g,
-                        clusters[point.cluster].b,
+                        clusters[point.assigned_cluster].r,
+                        clusters[point.assigned_cluster].g,
+                        clusters[point.assigned_cluster].b,
                     ),
-                    cluster: point.cluster,
+                    assigned_cluster: point.assigned_cluster,
                 };
 
-                if clustering_metric(point.clone(), temp_cluster_pixel.clone(),ratio)
-                    < clustering_metric(point.clone(), assigned_cluster_pixel.clone(),ratio)
+                if clustering_metric(point.clone(), temp_cluster_pixel.clone(), ratio)
+                    < clustering_metric(point.clone(), assigned_cluster_pixel.clone(), ratio)
                 {
                     let index = clusters
                         .iter()
                         .position(|&value| value == cluster.clone())
                         .unwrap();
-                    point.cluster = index;
+                    point.assigned_cluster = index;
                     //println!("")
                 }
             }
@@ -240,7 +273,7 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
         for cluster in &clusters {
             println!("cluster ({:.2},{:.2}): ", cluster.0, cluster.1,cluster.2);
             for point in &kmeans_pixels {
-                if clusters[point.cluster] == cluster.clone() {
+                if clusters[point.assigned_cluster] == cluster.clone() {
                     //point.print();
                     //println!(" #{}", count);
                     count += 1;
@@ -252,23 +285,18 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
         // Update the location of the clusters
         prev_clusters = clusters.clone();
         for i in 0..clusters.len() {
-            //let mut x_sum: u32 = 0;
-            //let mut y_sum: u32 = 0;
-            //let mut r_sum: u32 = 0;
-            //let mut g_sum: u32 = 0;
-            //let mut b_sum: u32 = 0;
             let (mut x_sum, mut y_sum, mut r_sum, mut g_sum, mut b_sum) =
                 (0u32, 0u32, 0u32, 0u32, 0u32);
             let mut counter: u32 = 0;
 
             for point in &kmeans_pixels {
-                //if kmeans_pixels[j].cluster == clusters[i] {
-                //if color_distance(clusters[point.cluster].clone(), clusters[i].clone()) < 0.05 {
-                if clusters[point.cluster].clone() == clusters[i].clone() {
+                //if kmeans_pixels[j].assigned_cluster == clusters[i] {
+                //if color_distance(clusters[point.assigned_cluster].clone(), clusters[i].clone()) < 0.05 {
+                if clusters[point.assigned_cluster].clone() == clusters[i].clone() {
                     //println!("Pixel {:?} assigned to cluster #{}",point.position,i);
                     counter = counter + 1;
-                    x_sum = x_sum + point.position.0 as u32;
-                    y_sum = y_sum + point.position.1 as u32;
+                    x_sum = x_sum + point.x as u32;
+                    y_sum = y_sum + point.y as u32;
                     r_sum = r_sum + point.rgb.0 as u32;
                     g_sum = g_sum + point.rgb.1 as u32;
                     b_sum = b_sum + point.rgb.2 as u32;
@@ -305,7 +333,7 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
         for n in 0..clusters.len() {
             counts.push(0u32);
             for point in &kmeans_pixels {
-                if point.cluster == n {
+                if point.assigned_cluster == n {
                     counts[n] += 1;
                 }
             }
@@ -333,8 +361,8 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
     }
 
     for pixel in &kmeans_pixels {
-        cluster_centers[pixel.cluster].0 += (pixel.position.0 as u32);
-        cluster_centers[pixel.cluster].1 += (pixel.position.1 as u32);
+        cluster_centers[pixel.assigned_cluster].0 += (pixel.x as u32);
+        cluster_centers[pixel.assigned_cluster].1 += (pixel.y as u32);
     }
 
     for n in 0..cluster_centers.len() {
@@ -357,9 +385,9 @@ pub fn cluster_image(img_path: &str, num_clusters: usize,ratio: f64) -> ImageBuf
                 x,
                 y,
                 image::Rgb([
-                    clusters[ppx.cluster].r,
-                    clusters[ppx.cluster].g,
-                    clusters[ppx.cluster].b,
+                    clusters[ppx.assigned_cluster].r,
+                    clusters[ppx.assigned_cluster].g,
+                    clusters[ppx.assigned_cluster].b,
                 ]),
             );
         }
@@ -417,4 +445,108 @@ fn build_random_clusters(num_clusters: usize, w: u32, h: u32) -> Vec<Cluster> {
         println!("Cluster {}: {:?}", i, clusters[i]);
     }
     clusters
+}
+
+//--------------------
+// Density-based clustering
+//
+
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::*;
+
+pub fn db_cluster_image(img_path: &str,epsilon: f64,min_nghbrs: usize,size: u32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+
+    let mut img = image::open(img_path).expect("Couldn't open the image").resize(size,size,Triangle);
+    let (w, h) = img.dimensions();
+    let mut rng = rand::thread_rng();
+
+    let mut list: Vec<CPixel> = Vec::with_capacity((w*h) as usize);
+    let mut cn = 0;
+
+    for x in 0..w {
+        for y in 0..h {
+            let px = img.get_pixel(x,y);
+            list.push(CPixel::new(x,y,(px[0],px[1],px[2]),0));
+        }
+    }
+    let ll = list.len();
+
+
+    // We'll stay in this loop until there's no more points assigned to cluster #0 (default cluster)
+    while list.clone().into_iter().filter(|x| x.assigned_cluster == 0).collect::<Vec<CPixel>>().len() > 0 {
+
+        let mut remaining_zeros = list.clone().into_iter().filter(|x| x.assigned_cluster == 0).collect::<Vec<CPixel>>().len();
+
+        for i in 0..ll {
+            for j in 0..ll {
+                if list[j].assigned_cluster == 0 {
+                    //println!("checking if point[{}] belongs the same cluster as point[{}]",j, i);
+                    let distance = list[j].calculate_distance(list[i]);
+                    //println!("The distance between list[{}] and list[{}] is {}",i,j,distance);
+                    if distance < epsilon {
+                        list[j].assigned_cluster = list[i].assigned_cluster;
+                        println!("#{} Assigning ({},{}) a cluster of {}",i,list[j].x,list[j].y,list[j].assigned_cluster);
+                    }
+                }
+            }
+            remaining_zeros = list.clone().into_par_iter().filter(|x| x.assigned_cluster == 0).collect::<Vec<CPixel>>().len();
+            if remaining_zeros == 0 {
+                break;
+            }
+            //println!("The remaining number of zeros during loop #{} are: {:?}",i,remaining_zeros);
+        }
+
+        //let zeros = Vec::new();
+        println!("Going to find the index now!");
+        let index = match list.par_iter().position(|&x| x.assigned_cluster == 0) {
+            Some(n) => n,
+            None => break
+        };
+        println!("index = {:?}",index);
+        list[index].assigned_cluster = cn;
+        //println!("index: {:?}",index);
+        cn += 1;
+        println!("cn now equals: {}",cn);
+    }
+
+    // Let's get a count of the total valid clusters
+    println!("- Counting clusters...");
+    let mut cluster_counts = Vec::new();
+    for _ in 0..cn { cluster_counts.push(0);}
+    for point in &list {
+        for i in 0..cn {
+            if point.assigned_cluster == i {
+                cluster_counts[i] +=1;
+            }
+        }
+    }
+    println!("cluster_counts:\n{:?}",cluster_counts);
+    let mut total_valid_clusters = 0;
+    cluster_counts.iter().for_each(|x| if *x >= min_nghbrs {total_valid_clusters +=1;});
+
+    // Building a set of colors for the images
+    let mut colors: Vec<(u8,u8,u8)> = Vec::new();
+    for _ in 0..total_valid_clusters {
+        colors.push((rng.gen_range(0,255u8),rng.gen_range(0,255u8),rng.gen_range(0,255u8)));
+    }
+
+    // Now we're going to build the newly clustered image
+    let mut clustered_img = image::ImageBuffer::new(w, h);
+    for pixel in &list {
+        for i in 0..total_valid_clusters {
+            if pixel.assigned_cluster == i {
+                clustered_img.put_pixel(pixel.x,pixel.y,image::Rgb([colors[i].0,colors[i].1,colors[i].2]));
+                break;
+            }
+            else {
+                clustered_img.put_pixel(pixel.x,pixel.y,image::Rgb([255,255,255]));
+            }
+        }
+    }
+
+    clustered_img
+
+
 }

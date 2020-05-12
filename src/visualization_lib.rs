@@ -5,12 +5,14 @@ use plotlib::repr::Scatter;
 use plotlib::style::{PointMarker, PointStyle};
 use plotlib::view::ContinuousView;
 
+use image::GenericImageView;
+
 use rand::Rng;
 use std::process::Command;
 
-use crate::*;
+use crate::algorithm_lib::*;
 
-pub fn kmeans_plot(kmeans_list: Vec<KMeansPixel>, clusters: Vec<(f64, f64)>, path_root: String) {
+pub fn kmeans_plot(kmeans_list: Vec<CPixel>, clusters: Vec<(f64, f64)>, path_root: String) {
     // Checks the total number of elemnts being visualized
     let mut vis_vec: Vec<Vec<(f64, f64)>> = Vec::new();
     for _ in &clusters {
@@ -22,13 +24,13 @@ pub fn kmeans_plot(kmeans_list: Vec<KMeansPixel>, clusters: Vec<(f64, f64)>, pat
         for cluster in &clusters {
             if get_distance(
                 (
-                    clusters[point.cluster].0 as u32,
-                    clusters[point.cluster].1 as u32,
+                    clusters[point.assigned_cluster].0 as u32,
+                    clusters[point.assigned_cluster].1 as u32,
                 ),
                 (cluster.clone().0 as u32, cluster.clone().1 as u32),
             ) < 0.05
             {
-                vis_vec[counter].push((point.position.0 as f64, point.position.1 as f64));
+                vis_vec[counter].push((point.x as f64, point.y as f64));
             }
             counter += 1;
         }

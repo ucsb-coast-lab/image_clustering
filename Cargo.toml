@@ -14,7 +14,5 @@ rscam = "0.5.5"
 plotlib = { git = "https://github.com/quietlychris/plotlib", branch = "master" }
 rayon = "^1.2"
 
-
 [lib]
 name = "image_clustering"
-crate-type = ["staticlib","cdylib"]

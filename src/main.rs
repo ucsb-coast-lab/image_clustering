@@ -5,11 +5,11 @@ use image::ImageBuffer;
 use image::*;
 
 mod algorithm_lib;
-mod externals_lib;
+//mod externals_lib; // There's a problem dependency on v4l2 with this
 mod visualization_lib;
 
 use algorithm_lib::*;
-use externals_lib::*;
+//use externals_lib::*;
 use visualization_lib::scatter_image_sandbox;
 
 use rand::{Rng, SeedableRng};
@@ -35,7 +35,8 @@ fn main() {
         let path = args[i].clone().into_string().unwrap().to_string();
         let parsed_path: Vec<_> = path.split("/").collect();
         //println!("parsed_path: {:?}", parsed_path);
-        let clustered_img = kmeans_cluster_image(&path, num_clusters, ratio);
+        let mut img = image::open(&path).expect("Couldn't open the image");
+        let clustered_img = kmeans_cluster_image(img, num_clusters, ratio);
         // let clustered_img = db_cluster_image(&path, epsilon, min_nghbrs,size);
         clustered_img
             .save(export_dir.to_owned() + &parsed_path[parsed_path.len() - 1])

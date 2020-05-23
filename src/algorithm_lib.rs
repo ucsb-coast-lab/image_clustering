@@ -133,10 +133,9 @@ pub fn clustering_metric(a: CPixel, b: CPixel, ratio: f64) -> f64 {
 // Converts an image to a vector of KMeanPixel structures, and returns that and the images dimensions in a tuple
 // Pixels are written to a vector in rows (row 0 all written, then row 1 all written, row 2, etc.)
 pub fn build_kmeans_pixel_list_from_image(
-    img_path: &str,
+    mut img: DynamicImage,
     clusters: Vec<Cluster>,
 ) -> (Vec<CPixel>, u32, u32) {
-    let mut img = image::open(img_path).expect("Couldn't open the image");
     let (w, h) = img.dimensions();
     println!("Image dimensions: ({},{})", w, h);
 
@@ -209,14 +208,14 @@ pub fn build_kmeans_pixel_list_from_image(
 }
 
 pub fn kmeans_cluster_image(
-    img_path: &str,
+    mut img: DynamicImage,
     num_clusters: usize,
     ratio: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let mut img = image::open(img_path).expect("Couldn't open the image");
+
     let (w, h) = img.dimensions();
     let mut clusters: Vec<Cluster> = build_random_clusters(num_clusters, w, h);
-    let (mut kmeans_pixels, w, h) = build_kmeans_pixel_list_from_image(img_path, clusters.clone());
+    let (mut kmeans_pixels, w, h) = build_kmeans_pixel_list_from_image(img, clusters.clone());
 
     let mut iteration = 0;
     let mut prev_clusters: Vec<Cluster> = Vec::with_capacity(num_clusters);
@@ -352,7 +351,7 @@ pub fn kmeans_cluster_image(
             }
         }
     }
-    println!("{} underwent {} iterations", img_path, iteration);
+    println!("The image underwent {} iterations", iteration);
 
     // Find the x,y centers of each cluster
     let mut cluster_centers: Vec<(u32, u32)> = Vec::with_capacity(num_clusters);

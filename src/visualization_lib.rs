@@ -111,7 +111,7 @@ pub fn scatter_image_sandbox(img_path: &str, export_path: &str) {
             b: cluster_rng.gen_range(50, 200) as u8,
         });
     }
-    let (pixel_vec, w, h) = build_kmeans_pixel_list_from_image(img_path, clusters);
+    let (pixel_vec, w, h) = build_kmeans_pixel_list_from_image(img, clusters);
     let mut vis_vec: Vec<(f64, f64)> = Vec::with_capacity(pixel_vec.len());
     let (mut min_x, mut max_x, mut min_y, mut max_y) = (0f64, 0f64, 0f64, 0f64);
     for pixel in &pixel_vec {

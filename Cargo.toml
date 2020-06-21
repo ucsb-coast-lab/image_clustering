@@ -10,7 +10,7 @@ edition = "2018"
 image = "0.22.3"
 imageproc = "0.19.2"
 rand = "0.7.2"
-rscam = "0.5.5"
+#rscam = "0.5.5"
 plotlib = { git = "https://github.com/quietlychris/plotlib", branch = "master" }
 rayon = "^1.2"
 

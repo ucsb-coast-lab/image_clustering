@@ -22,7 +22,7 @@ fn main() {
 
     // For kmeans clustering
     let num_clusters = 3; // Controls the number of clusters
-    let ratio = 0.2; // Controls the ratio of how important Euclidean pixel distance vs. color variation is
+    let ratio = 0.0; // Controls the ratio of how important Euclidean pixel distance vs. color variation is
 
     // For density-based clustering
     // let epsilon: f64 = 4.;

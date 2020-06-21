@@ -145,7 +145,7 @@ pub fn build_kmeans_pixel_list_from_image(
     for y in 0..h {
         for x in 0..w {
             let pixel = img.get_pixel(x, y);
-            let (mut r, mut g, mut b) = (pixel[0] as f32, pixel[1] as f32, pixel[2] as f32);
+            let (mut r, mut g, mut b) = (pixel[2] as f32, pixel[1] as f32, pixel[0] as f32);
             r = ((r / 255.0) * (max - min)) + min;
             g = ((g / 255.0) * (max - min)) + min;
             b = ((b / 255.0) * (max - min)) + min;
@@ -375,24 +375,49 @@ pub fn kmeans_cluster_image(
     }
     println!("Cluster centers are {:?}", cluster_centers);
 
+    let mut selected_cluster_num = 0;
+    for i in 0..clusters.len() {
+        if clusters[selected_cluster_num].b > clusters[i].b {
+            selected_cluster_num = i;
+        }
+    }
+    println!("Selected cluster is: {}",selected_cluster_num);
+
     // BUILDING CLUSTERED IMAGE
     // Built clusters, now iterating through pixels to re-build clustered image
     let mut clustered_img = image::ImageBuffer::new(w, h);
     for y in 0..h {
         for x in 0..w {
             let ppx = kmeans_pixels[(w * y + x) as usize];
-            clustered_img.put_pixel(
-                x,
-                y,
-                image::Rgb([
-                    clusters[ppx.assigned_cluster].r,
-                    clusters[ppx.assigned_cluster].g,
-                    clusters[ppx.assigned_cluster].b,
-                ]),
-            );
+            if ppx.assigned_cluster == selected_cluster_num {
+                clustered_img.put_pixel(
+                    x,
+                    y,
+                    image::Rgb([
+                        //clusters[ppx.assigned_cluster].b,
+                        //clusters[ppx.assigned_cluster].g,
+                        //clusters[ppx.assigned_cluster].r,
+                        255,255,255
+                    ]),
+                );
+            }
+            else {
+                clustered_img.put_pixel(
+                    x,
+                    y,
+                    image::Rgb([
+                        0,
+                        0,
+                        0,
+                    ]),
+                );
+            }
+
         }
     }
 
+    // Draws a circle around the centroids in the image
+    /*
     for center in &cluster_centers {
         draw_hollow_circle_mut(
             &mut clustered_img,
@@ -401,6 +426,7 @@ pub fn kmeans_cluster_image(
             image::Rgb([0, 0, 0]),
         );
     }
+    */
     clustered_img
 
     // Sleeping the thread here can help us visualize the clustering process
